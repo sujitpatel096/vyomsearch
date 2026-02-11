@@ -1,8 +1,11 @@
-name: NSE SME Announcement Bot
-
 on:
   schedule:
-    - cron: '0/30 2-16 * * 1-7'
+    # Weekdays: Every 30 minutes from 7:30 AM to 10:29 PM IST
+    - cron: '0,30 2-16 * * 1-5'
+    
+    # Weekends: Every 2 hours from 7:30 AM to 10:29 PM IST
+    - cron: '0 2,4,6,8,10,12,14,16 * * 0,6'
+  
   workflow_dispatch:
 
 jobs:
