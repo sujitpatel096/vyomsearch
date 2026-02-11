@@ -2,7 +2,7 @@ name: NSE SME Announcement Bot
 
 on:
   schedule:
-    # Every 15 minutes, 9 AM - 10 PM IST, weekdays only
+    # Every 15 minutes, 9 AM - 10 PM IST (3:30 UTC - 16:30 UTC), weekdays only
     - cron: '*/15 3-16 * * 1-5'
   
   workflow_dispatch:
@@ -30,3 +30,32 @@ jobs:
         BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         CHAT_ID: ${{ secrets.CHAT_ID }}
       run: python sme_bot.py
+```
+
+## Why this is better:
+
+✅ **Single schedule** (no conflicts)
+✅ **Simple syntax** (`*/15` is more reliable than `0,30`)
+✅ **Runs every 15 minutes** (so even if some runs are skipped, you still get good coverage)
+
+## Monitor for the next 2 hours:
+
+After committing this change, wait and check the **Actions** tab. You should see runs at approximately:
+- Current time + 15 mins
+- Current time + 30 mins  
+- Current time + 45 mins
+- Current time + 60 mins
+
+## If this STILL only runs 2 times per day:
+
+Then GitHub Actions cron is being throttled for your account/repo. In that case, you have these options:
+
+### Option 1: Use external cron service (Free & Reliable)
+
+Use **cron-job.org** (free) to trigger your workflow:
+
+1. Go to https://cron-job.org/en/ 
+2. Create free account
+3. Create a new cron job with this URL:
+```
+   https://api.github.com/repos/Chintanp10/NSE-SME-Circular/dispatches
