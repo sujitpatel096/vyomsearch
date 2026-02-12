@@ -1,4 +1,4 @@
-name: NSE SME Announcement Bot
+name: SME Announcement Bot (NSE + BSE)
 
 on:
   schedule:
@@ -7,9 +7,14 @@ on:
 
   workflow_dispatch:
 
+concurrency:
+  group: sme-bot
+  cancel-in-progress: false
+
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+    timeout-minutes: 8
 
     permissions:
       contents: write
@@ -22,6 +27,7 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
+        cache: 'pip'
 
     - name: Install dependencies
       run: |
@@ -34,10 +40,11 @@ jobs:
         CHAT_ID: ${{ secrets.CHAT_ID }}
       run: python sme_bot.py
 
-    - name: Persist sent announcements tracking
+    - name: Persist tracking data
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
-        git add sent_announcements.json
-        git diff --cached --quiet || git commit -m "Update sent announcements tracking [skip ci]"
-        git push
+        git pull --rebase origin main || true
+        git add sent_announcements.json bse_sme_scrips.json
+        git diff --cached --quiet || git commit -m "Update tracking data [skip ci]"
+        git push || true
