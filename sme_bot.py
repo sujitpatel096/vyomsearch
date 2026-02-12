@@ -411,7 +411,9 @@ def format_announcement(ann, index=None, exchange="nse"):
         # Parse ISO datetime to readable date
         raw_dt = ann.get('NEWS_DT', '')
         try:
-            date = datetime.fromisoformat(raw_dt).strftime('%d-%b-%Y %H:%M')
+            # Handle variable fractional second lengths (e.g. .94, .373, .12345)
+            dt_clean = raw_dt.split('.')[0] if '.' in raw_dt else raw_dt
+            date = datetime.fromisoformat(dt_clean).strftime('%d-%b-%Y %H:%M')
         except (ValueError, TypeError):
             date = html.escape(str(raw_dt))
         attachment = ann.get('ATTACHMENTNAME', '')
