@@ -285,10 +285,23 @@ def fetch_nse_sme_announcements():
 
 # --- BSE fetch ---
 
-def fetch_bse_sme_announcements(sme_scrip_codes):
-    """Fetch BSE equity announcements and filter to SME scrips. Returns list or None on failure."""
+def _filter_bse_sme(items, sme_scrip_codes):
+    """Filter BSE announcements to only SME scrip codes."""
+    return [
+        ann for ann in items
+        if str(ann.get('SCRIP_CD', '')).strip() in sme_scrip_codes
+    ]
+
+
+def fetch_bse_sme_announcements(sme_scrip_codes, sent_ids=None):
+    """Fetch BSE equity announcements and filter to SME scrips. Returns list or None on failure.
+
+    On incremental runs (sent_ids is non-empty), stops pagination early once a page
+    yields no new SME announcements, since results are ordered newest-first.
+    """
     today = datetime.now(IST)
     date_str = today.strftime('%Y%m%d')
+    is_incremental = bool(sent_ids)
 
     url = f"{BSE_API_URL}/AnnSubCategoryGetData/w"
     params = {
@@ -302,7 +315,8 @@ def fetch_bse_sme_announcements(sme_scrip_codes):
         "strType": "C",
     }
 
-    all_announcements = []
+    sme_announcements = []
+    pages_without_new_sme = 0
 
     for attempt in range(1, BSE_MAX_RETRIES + 1):
         try:
@@ -321,12 +335,27 @@ def fetch_bse_sme_announcements(sme_scrip_codes):
                 if data.get('Table1'):
                     total_count = data['Table1'][0].get('ROWCNT', 0)
 
-                all_announcements.extend(page_items)
-                logger.info("BSE page 1: %d items, total=%d", len(page_items), total_count)
+                # Filter page 1 for SME
+                page_sme = _filter_bse_sme(page_items, sme_scrip_codes)
+                sme_announcements.extend(page_sme)
+                fetched_so_far = len(page_items)
+
+                logger.info("BSE page 1: %d items (SME: %d), total=%d", len(page_items), len(page_sme), total_count)
+
+                # Check early termination for incremental runs
+                if is_incremental and page_sme:
+                    new_on_page = sum(1 for a in page_sme if get_announcement_id(a, "bse") not in sent_ids)
+                    if new_on_page == 0:
+                        pages_without_new_sme += 1
 
                 # Paginate if needed
                 page_no = 2
-                while len(all_announcements) < total_count and page_no <= 50:
+                while fetched_so_far < total_count and page_no <= 50:
+                    # Early termination: stop if 3 consecutive pages had no new SME items
+                    if is_incremental and pages_without_new_sme >= 3:
+                        logger.info("Early stop: 3 consecutive pages with no new SME announcements")
+                        break
+
                     time.sleep(0.5)
                     page_params = dict(params, pageno=page_no)
                     resp = requests.get(url, headers=BSE_HEADERS, params=page_params, timeout=15)
@@ -335,8 +364,20 @@ def fetch_bse_sme_announcements(sme_scrip_codes):
                         items = page_data.get('Table', [])
                         if not items:
                             break
-                        all_announcements.extend(items)
-                        logger.info("BSE page %d: %d items (total so far: %d)", page_no, len(items), len(all_announcements))
+
+                        page_sme = _filter_bse_sme(items, sme_scrip_codes)
+                        sme_announcements.extend(page_sme)
+                        fetched_so_far += len(items)
+
+                        # Track consecutive pages without new SME announcements
+                        if is_incremental:
+                            new_on_page = sum(1 for a in page_sme if get_announcement_id(a, "bse") not in sent_ids) if page_sme else 0
+                            if new_on_page == 0:
+                                pages_without_new_sme += 1
+                            else:
+                                pages_without_new_sme = 0
+
+                        logger.info("BSE page %d: %d items, SME: %d (total SME: %d)", page_no, len(items), len(page_sme), len(sme_announcements))
                     else:
                         logger.warning("BSE page %d HTTP %d, stopping pagination", page_no, resp.status_code)
                         break
@@ -366,13 +407,7 @@ def fetch_bse_sme_announcements(sme_scrip_codes):
         logger.error("Failed to fetch from BSE after %d attempts", BSE_MAX_RETRIES)
         return None
 
-    # Filter to SME scrip codes (SCRIP_CD is int in announcements, string in cache)
-    sme_announcements = [
-        ann for ann in all_announcements
-        if str(ann.get('SCRIP_CD', '')).strip() in sme_scrip_codes
-    ]
-
-    logger.info("BSE announcements: total=%d, SME filtered=%d", len(all_announcements), len(sme_announcements))
+    logger.info("BSE SME announcements: %d (early_stop=%s)", len(sme_announcements), is_incremental and pages_without_new_sme >= 3)
     return sme_announcements
 
 
@@ -495,7 +530,7 @@ def main():
             logger.error("Failed to fetch BSE SME scrip codes")
 
     if sme_scrip_codes:
-        bse_result = fetch_bse_sme_announcements(sme_scrip_codes)
+        bse_result = fetch_bse_sme_announcements(sme_scrip_codes, sent_ids=sent_ids)
         if bse_result is not None:
             bse_announcements = bse_result
             bse_ok = True
