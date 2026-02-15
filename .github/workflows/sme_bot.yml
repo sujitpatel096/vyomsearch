@@ -3,7 +3,7 @@ name: SME Announcement Bot (NSE + BSE)
 on:
   schedule:
     # Every 30 minutes, 9 AM - 10 PM IST (3:30 UTC - 16:30 UTC), All days only
-    - cron: '*/30 3-16 * * 1-7'
+    - cron: '*/30 3-16 * * 0-6'
 
   workflow_dispatch:
 
