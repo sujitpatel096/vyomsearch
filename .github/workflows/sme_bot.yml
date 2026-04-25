@@ -47,7 +47,7 @@ jobs:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
         run: |
-          python nse_sme_circular.py
+          python sme_bot.py
 
       - name: Save cache
         uses: actions/cache@v4
