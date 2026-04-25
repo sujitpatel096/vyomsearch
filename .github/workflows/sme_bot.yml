@@ -1,50 +1,59 @@
-name: SME Announcement Bot (NSE + BSE)
+name: SME Announcement Bot
 
 on:
   schedule:
-    # Every 30 minutes, 9 AM - 10 PM IST (3:30 UTC - 16:30 UTC), All days only
-    - cron: '*/30 3-16 * * 0-6'
-
+    - cron: '*/15 3-11 * * 1-5'  # Every 15 min, 8:30am-5pm IST (Mon-Fri)
   workflow_dispatch:
-
-concurrency:
-  group: sme-bot
-  cancel-in-progress: false
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
-
-    permissions:
-      contents: write
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-        cache: 'pip'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
 
-    - name: Run SME Bot
-      env:
-        BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-        CHAT_ID: ${{ secrets.CHAT_ID }}
-      run: python sme_bot.py
+      - name: Install Python dependencies
+        run: |
+          pip install requests jinja2 playwright
 
-    - name: Persist tracking data
-      run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-        git pull --rebase origin main || true
-        git add sent_announcements.json bse_sme_scrips.json
-        git diff --cached --quiet || git commit -m "Update tracking data [skip ci]"
-        git push || true
+      - name: Install Playwright Chromium
+        run: |
+          playwright install chromium --with-deps
+
+      - name: Restore sent announcements cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            sent_announcements.json
+            bse_sme_scrips.json
+          key: sme-cache-${{ github.run_id }}
+          restore-keys: |
+            sme-cache-
+
+      - name: Run SME bot
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: |
+          python nse_sme_circular.py
+
+      - name: Save cache
+        uses: actions/cache@v4
+        if: always()
+        with:
+          path: |
+            sent_announcements.json
+            bse_sme_scrips.json
+          key: sme-cache-${{ github.run_id }}
