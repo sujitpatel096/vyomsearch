@@ -1130,7 +1130,7 @@ def _render_window_sections(pdf: MarketBriefPDF, sections: dict, show_filtered: 
         pdf.section_title("Filtered Out (Not Material)")
         for sym, cname, reason in discarded_list:
             line = clean_for_pdf(f"{sym} ({cname}) - {reason}")
-            pdf.set_font("Helvetica", "", 8)
+            pdf.set_font("DJ", "", 8)
             pdf.set_text_color(150, 150, 150)
             pdf.multi_cell(0, 4.5, f"  - {line}")
         pdf.ln(2)
