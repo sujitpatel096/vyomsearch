@@ -1,0 +1,34 @@
+name: NSE SME Pipeline
+
+on:
+  schedule:
+    - cron: '31 2 * * *'  # 8:01 AM IST = 2:31 AM UTC
+  workflow_dispatch:       # Manual run bhi kar sakte ho
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Create config.json from secret
+        run: echo '${{ secrets.CONFIG_JSON }}' > config.json
+
+      - name: Create client_secret.json from secret
+        run: echo '${{ secrets.CLIENT_SECRET_JSON }}' > client_secret.json
+
+      - name: Create token.json from secret
+        run: echo '${{ secrets.TOKEN_JSON }}' > token.json
+
+      - name: Run pipeline
+        run: python main.py
