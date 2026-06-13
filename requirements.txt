@@ -1,1 +1,8 @@
-requests==2.31.0
+groq
+google-genai
+pymupdf
+fpdf2
+requests
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib
